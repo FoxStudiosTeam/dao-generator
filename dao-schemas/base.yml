@@ -1,0 +1,24 @@
+tables:
+  - name: base
+    fields:
+    - name: code
+      type: string
+      isPrimary: true
+    - name: created_by
+      type: string
+    - name: updated_by
+      type: string
+    - name: updated_at
+      type: datetime
+    - name: created_at
+      type: datetime
+
+types:
+  text:
+    rustType: String
+  integer:
+    rustType: i128
+  date:
+    rustType: chrono::NaiveDate
+  timestamp:
+    rustType: chrono::NaiveDateTime

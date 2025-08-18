@@ -1,0 +1,9 @@
+tables:
+  - name: users
+    schema: auth
+    extends: base
+    fields:
+      - name: name
+        type: string
+      - name: some
+        type: int

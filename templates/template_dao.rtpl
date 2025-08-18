@@ -1,0 +1,7 @@
+#[derive(Clone,Debug)]
+#[fox_orm(table_name = "{{table.name}}")]
+pub struct {{name}} {
+    {{#each types}}
+    pub {{this.name}}: {{this.tp}},
+    {{/each}}
+}
