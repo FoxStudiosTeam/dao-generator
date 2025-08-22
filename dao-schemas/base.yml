@@ -2,16 +2,16 @@ tables:
   - name: base
     fields:
     - name: code
-      type: string
+      type: text
       isPrimary: true
     - name: created_by
-      type: string
+      type: text
     - name: updated_by
-      type: string
+      type: text
     - name: updated_at
-      type: datetime
+      type: timestamp
     - name: created_at
-      type: datetime
+      type: timestamp
 
 types:
   text:

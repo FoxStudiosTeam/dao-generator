@@ -1,13 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use core::panic;
 use handlebars::Handlebars;
-use std::{any::Any, collections::HashMap, fs, ops::Deref, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
-use crate::abs::{
-    iface::{IField, ITable, IType, IYamlData},
-    imp::YamlData,
-};
+use crate::abs::imp::{Field, Table, Type, YamlData};
 
 mod abs;
 
@@ -24,7 +20,6 @@ fn get_templates(args: &Args) -> Result<HashMap<String, String>> {
             "Не удалось сохранить шаблон в памяти".to_string()
         ))?;
 
-        tracing::info!("{}", content);
         map.insert(key.to_string(), content);
     }
 
@@ -33,6 +28,10 @@ fn get_templates(args: &Args) -> Result<HashMap<String, String>> {
 
 fn fill_data(args: &Args) -> Result<Vec<YamlData>, Box<dyn std::error::Error>> {
     let current_path = Path::new(&args.config_folder);
+    let mut result: Vec<YamlData> = Vec::new();
+    let mut types: HashMap<String, Type> = HashMap::new();
+    let mut tables: Vec<Table> = Vec::new();
+
     let mut yaml_data: Vec<YamlData> = Vec::new();
 
     for entry in fs::read_dir(current_path)? {
@@ -42,13 +41,67 @@ fn fill_data(args: &Args) -> Result<Vec<YamlData>, Box<dyn std::error::Error>> {
         if path.is_file() {
             let content = fs::read_to_string(&path)?;
             let yaml: YamlData = serde_yaml::from_str(&content)?;
+            if let Some(tbs) = yaml.tables.clone() {
+                tables.append(&mut tbs.clone())
+            }
+
+            if let Some(tps) = yaml.types.clone() {
+                types.extend(tps);
+            }
+
             yaml_data.push(yaml);
         }
     }
-    Ok(yaml_data)
+
+    for tb in tables.iter() {
+        let mut res = YamlData::default();
+        let mut tb = columns_dfs(tb.clone(), &tb.fields, &tables, &types, &args.target_lang);
+        tb.types = Some(types.clone());
+        res.tables = Some(vec![tb]);
+        res.types = Some(types.clone());
+        result.push(res);
+    }
+
+    Ok(result)
 }
 
-fn v2() -> anyhow::Result<()> {
+fn columns_dfs(
+    mut root: Table,
+    fields: &Vec<Field>,
+    tables: &Vec<Table>,
+    types: &HashMap<String, Type>,
+    target_lang: &String,
+) -> Table {
+    let mut parent_table = Table::default();
+    if let Some(extends) = root.clone().extends {
+        for table in tables.iter() {
+            tracing::info!("Пробуем сравнить {}, с {}", table.name, extends);
+            if table.name.eq(&extends) {
+                parent_table =
+                    columns_dfs(table.clone(), &table.fields, tables, &types, target_lang);
+                break;
+            }
+        }
+    }
+
+    let mut total_fields: Vec<Field> = Vec::new();
+    total_fields.append(&mut fields.clone());
+    total_fields.append(&mut parent_table.fields.clone());
+    root.fields = Vec::new();
+
+    for field in total_fields {
+        let mut field_to_save = field.clone();
+        for (tk, tv) in types.iter() {
+            if field.tp.eq(tk) {
+                field_to_save.tp = tv.rust_type.clone()
+            }
+        }
+        root.fields.push(field_to_save);
+    }
+    return root;
+}
+
+fn generate() -> anyhow::Result<()> {
     let args_result = fill_args()?;
     let r = fill_data(&args_result);
     let Ok(yaml_data) = r else {
@@ -62,72 +115,29 @@ fn v2() -> anyhow::Result<()> {
         return Err(anyhow::anyhow!(tpl_res.unwrap_err()));
     };
 
-    let mut types_map: HashMap<String, Box<dyn IType>> = HashMap::new();
-
-    let mut data_vec: Vec<Box<dyn ITable>> = Vec::new();
-
-    for single_yaml in yaml_data {
-        let types = single_yaml.get_types();
-        if types.is_some() {
-            for (k, v) in types.unwrap() {
-                types_map.insert(k, v);
-            }
-        }
-        let tables = single_yaml.get_tables();
-        if tables.is_some() {
-            for table in tables.unwrap() {
-                data_vec.push(table);
-            }
-        }
-    }
-
     let reg = Handlebars::new();
     let mut res: HashMap<String, String> = HashMap::new();
-    let mut filled_data = YamlData::default();
-    filled_data.set_tables(data_vec);
-    filled_data.set_types(types_map);
 
-    if let Some(tables) = filled_data.get_tables() {
-        for table in tables.iter() {
-            let mut unwrapped_data: HashMap<String, Box<dyn Any>> = HashMap::new();
-
-            if let Some(schema) = table.get_schema() {
-                unwrapped_data.insert("schema".to_string(), Box::new(schema.to_string()));
-            }
-
-            let mut fields = table.get_fields();
-
-            if let Some(extends) = table.get_extends() {
-                if let Some(tables_vec) = filled_data.get_tables() {
-                    if let Some(base_table) = tables_vec.iter().find(|t| t.get_name() == extends) {
-                        let base_fields = base_table.get_fields();
-                        for f in base_fields {
-                            fields.push(f.clone_box());
+    for yml in yaml_data.iter() {
+        if let Some(tbs) = yml.tables.clone() {
+            for table in tbs.iter() {
+                if let Some(_) = &table.extends {
+                    for (k, v) in &tpls {
+                        let raw_val = serde_json::to_value(table);
+                        if let Ok(val) = raw_val {
+                            tracing::info!("Info {}", val);
+                            if let Ok(tpl) = reg.render_template(v, &val) {
+                                tracing::info!("Successfully rendered template {}", k);
+                                if let Some(splitted) = table.name.split("/").last() {
+                                    res.insert(splitted.to_string(), tpl);
+                                }
+                            }
                         }
                     }
                 }
             }
-
-            unwrapped_data.insert("fields".to_string(), Box::new(fields));
-
-            unwrapped_data.insert("name".to_string(), Box::new(table.get_name()));
-
-            unwrapped_data.insert("types".to_string(), Box::new(filled_data.get_types()));
         }
     }
-
-    // for yaml in filled_data.get_tables().iter() {
-    //         let tpl_render_res = reg.render_template(&tpl_content, &filled_data);
-    //         let Ok(rendered_tpl) = tpl_render_res else {
-    //             return Err(anyhow::anyhow!(tpl_render_res.unwrap_err()));
-    //         };
-    //         let splitted = tpl_name.split("/").last();
-    //         if splitted.is_none() {
-    //             panic!("File {}", tpl_name);
-    //         }
-    //         tracing::info!("{}", rendered_tpl);
-    //         res.insert(splitted.unwrap().to_string(), rendered_tpl);
-    //     }
 
     for (file_name, content) in res {
         dbg!(&file_name);
@@ -143,17 +153,18 @@ fn v2() -> anyhow::Result<()> {
             break;
         };
     }
-    tracing::info!("ok");
     Ok(())
 }
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
-    v2()
+    generate()
 }
 
 #[derive(Parser, Debug)]
 struct Args {
+    #[arg(long)]
+    target_lang: String,
     #[arg(long)]
     config_folder: String,
     #[arg(long)]
@@ -177,6 +188,11 @@ fn fill_args() -> Result<Args> {
     if args.template_path.is_empty() {
         return Err(anyhow::anyhow!(
             "Не указана целевая папка с шаблонами dao".to_string()
+        ));
+    }
+    if args.target_lang.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Не указан целевой язык для описания dto".to_string()
         ));
     }
 

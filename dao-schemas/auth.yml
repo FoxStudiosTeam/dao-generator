@@ -4,6 +4,6 @@ tables:
     extends: base
     fields:
       - name: name
-        type: string
+        type: text
       - name: some
-        type: int
+        type: integer
