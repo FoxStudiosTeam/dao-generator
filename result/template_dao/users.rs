@@ -1,6 +1,6 @@
 #[derive(Clone,Debug)]
 #[fox_orm(table_name = "users")]
-pub struct users {
+pub struct Users {
     pub name: String,
     pub some: i128,
     pub code: String,
