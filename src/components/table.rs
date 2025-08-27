@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use hashbrown::HashMap;
-use tracing::field;
 
 use crate::prelude::{Field, Type};
 

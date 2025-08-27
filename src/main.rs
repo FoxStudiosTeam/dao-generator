@@ -7,8 +7,8 @@ use dao_generator::prelude::*;
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
-    let schema = YamlSchema::from_dir(args.config_folder)?;
-    let res = schema.render_all(args.templates_path)?;
+    let schema = Schema::from_dir(args.config_folder)?;
+    let res = schema.render_tables(args.templates_path)?;
     for (template, rendered) in res {
         fs::create_dir(Path::new(&format!("{}/{}", args.target_path, template))).ok();
         for (name, rendered) in rendered {

@@ -15,7 +15,7 @@ struct RawYamlSchema {
 }
 
 impl RawYamlSchema {
-    fn flatten(self) -> Result<YamlSchema> {
+    fn flatten(self) -> Result<Schema> {
         let tables: HashMap<String, RawTable> = self.tables.into_iter().map(|t| (t.name.clone(), t)).collect();
         let mut flatten_tables: HashMap<String, Table> = Default::default();
 
@@ -52,7 +52,7 @@ impl RawYamlSchema {
             }
             flatten_tables.insert(table_name.clone(), table.complete(&self.types).map_err(|e: String| anyhow::anyhow!(e))?);
         }
-        Ok(YamlSchema { tables: flatten_tables, types: self.types })
+        Ok(Schema { tables: flatten_tables, types: self.types })
     }
 
     fn from_dir<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -84,13 +84,13 @@ impl RawYamlSchema {
 }
 
 #[derive(Clone, Serialize, Default, Debug)]
-pub struct YamlSchema {
+pub struct Schema {
     pub tables: HashMap<String, Table>,
     pub types: HashMap<String, Type>,
 }
 
 
-impl YamlSchema {
+impl Schema {
     pub fn from_dir<P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(RawYamlSchema::from_dir(path)?.flatten()?)
     }
@@ -122,8 +122,8 @@ impl YamlSchema {
 
 
 
-impl RenderScheme for YamlSchema {
-    fn render_all<P: AsRef<Path>>(&self, templates: P) -> anyhow::Result<HashMap<String, Vec<(String, String)>>> {
+impl RenderScheme for Schema {
+    fn render_tables<P: AsRef<Path>>(&self, templates: P) -> anyhow::Result<HashMap<String, Vec<(String, String)>>> {
         // todo: make global registry
         let mut reg = handlebars::Handlebars::new();
         reg.register_default_helpers();
@@ -158,5 +158,14 @@ impl RenderScheme for YamlSchema {
             result.insert(template, data);
         }
         Ok(result)
+    }
+
+    fn render<P: AsRef<Path>>(&self, template: P) -> anyhow::Result<String> {
+        let mut reg = handlebars::Handlebars::new();
+        let name = template.as_ref().file_stem().ok_or_else(|| anyhow::anyhow!("Can't get file name"))?
+            .to_str().ok_or_else(|| anyhow::anyhow!("Can't get file name"))?;
+        reg.register_template_file(name, template.as_ref())?;
+        let rendered = reg.render(name, &self)?;
+        Ok(rendered)
     }
 }
