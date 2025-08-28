@@ -18,7 +18,7 @@ types:
   text:
     rustType: String
   integer:
-    rustType: i128
+    rustType: bigdecimal::BigDecimal
   date:
     rustType: chrono::NaiveDate
   timestamp:
