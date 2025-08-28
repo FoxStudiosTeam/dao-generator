@@ -5,6 +5,8 @@ pub struct Field {
     pub name: String,
     #[serde(rename = "type")]
     pub tp: String,
-    pub is_primary: Option<bool>,
+    #[serde(rename = "isPrimary")]
+    #[serde(default)]
+    pub is_primary: bool,
 }
 
