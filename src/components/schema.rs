@@ -141,7 +141,8 @@ impl RenderScheme for Schema {
     fn render<P: AsRef<Path>>(&self, template: P) -> anyhow::Result<String> {
         let mut reg = handlebars::Handlebars::new();
         let name = template.as_ref().file_stem().ok_or_else(|| anyhow::anyhow!("Can't get file name"))?
-            .to_str().ok_or_else(|| anyhow::anyhow!("Can't get file name"))?;
+        .to_str().ok_or_else(|| anyhow::anyhow!("Can't get file name"))?;
+        reg.register_default_helpers();
         reg.register_template_file(name, template.as_ref())?;
         let rendered = reg.render(name, &self)?;
         Ok(rendered)
