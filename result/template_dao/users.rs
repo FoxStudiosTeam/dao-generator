@@ -2,7 +2,7 @@
 #[fox_orm(table_name = "users")]
 pub struct Users {
     pub name: String,
-    pub some: i128,
+    pub some: bigdecimal::BigDecimal,
     pub code: String,
     pub created_by: String,
     pub updated_by: String,

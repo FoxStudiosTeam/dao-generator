@@ -30,7 +30,7 @@ pub fn snake_to_camel(
     let Some(s) = param.value().as_str() else { return Ok(()); };
 
     let mut camel = String::new();
-    let mut uppercase_next = false;
+    let mut uppercase_next = true;
 
     for c in s.chars() {
         if c == '_' {

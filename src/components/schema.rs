@@ -123,41 +123,19 @@ impl Schema {
 
 
 impl RenderScheme for Schema {
-    fn render_tables<P: AsRef<Path>>(&self, templates: P) -> anyhow::Result<HashMap<String, Vec<(String, String)>>> {
+    fn render_tables<P: AsRef<Path>>(&self, template: P) -> anyhow::Result<Vec<(String, String)>> {
         // todo: make global registry
         let mut reg = handlebars::Handlebars::new();
         reg.register_default_helpers();
-        let dir = fs::read_dir(templates)?;
-        let mut templates = vec![];
-        for e in dir {
-            let e = e?;
-            let path = e.path();
-            if path.is_dir() {continue;}
-            let e: std::result::Result<String, anyhow::Error> = (||{
-                let name = path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .ok_or_else(|| anyhow::anyhow!("Can't get file stem"))?
-                    .to_string();
-                reg.register_template_file(&name, path)?;
-                Ok(name)
-            })();
-            let Ok(name) = e else {
-                warn!("Failed to register template: {}", e.unwrap_err());
-                continue;
-            };
-            templates.push(name);
+        let template_name = template.as_ref().file_stem().ok_or_else(|| anyhow::anyhow!("Can't get file name"))?
+            .to_str().ok_or_else(|| anyhow::anyhow!("Can't get file name"))?;
+        reg.register_template_file(template_name, template.as_ref())?;
+        let mut data = vec![];
+        for (name, table) in self.tables.iter() {
+            let rendered = reg.render(template_name, &table)?;
+            data.push((name.clone(), rendered));
         }
-
-        let mut result: HashMap<String, Vec<(String, String)>> = Default::default();
-        for template in templates {
-            let mut data = vec![];
-            for (name, table) in self.tables.iter() {
-                let rendered = reg.render(&template, &table)?;
-                data.push((name.clone(), rendered));
-            }
-            result.insert(template, data);
-        }
-        Ok(result)
+        Ok(data)
     }
 
     fn render<P: AsRef<Path>>(&self, template: P) -> anyhow::Result<String> {
