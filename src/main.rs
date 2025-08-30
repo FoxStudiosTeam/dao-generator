@@ -2,12 +2,14 @@ use anyhow::Result;
 use clap::Parser;
 use std::{fs, path::{Path, PathBuf}};
 
-use dao_generator::prelude::*;
+use rust_commons::schema_reader::prelude::*;
  
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
+
     let schema = Schema::from_dir(args.config_folder)?;
+
     if args.template_path.is_dir() {
         let dir = fs::read_dir(args.template_path)?;
         for entry in dir {
