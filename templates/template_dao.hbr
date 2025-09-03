@@ -1,6 +1,6 @@
 #[derive(Clone,Debug)]
 #[fox_orm(table_name = "{{name}}")]
-pub struct {{name}} {
+pub struct {{snakeToCamel name}} {
     {{#each fields}}
     pub {{this.name}}: {{type}},
     {{/each}}
